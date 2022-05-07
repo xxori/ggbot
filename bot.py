@@ -57,7 +57,7 @@ class ggBot(bridge.AutoShardedBot):
 
         runtime = datetime.datetime.utcnow() - self.run_time
         self.logger.info(
-            f'Running duration: {datetime.timedelta(seconds=runtime)}'
+            f'Running duration: {runtime}'
         )
 
     async def close(self):
@@ -70,10 +70,11 @@ class ggBot(bridge.AutoShardedBot):
     async def on_message(self, message):
         if self.is_ready:
             ctx = await self.get_context(message)
-            if ctx.author == self:
+            if ctx.author.id == self.user.id:
                 return
             if ctx.guild is None:
                 await self.modmail(ctx)
+                await ctx.message.add_reaction("✉️")
                 return
             if ctx.guild != self.guild:
                 return
@@ -113,7 +114,7 @@ class ggBot(bridge.AutoShardedBot):
         )
     
     async def modmail(self, ctx):
-        await self.mailchannel.send(f"{ctx.author.mention}-{ctx.author.id}: {ctx.message.content}")
+        await self.mailchannel.send(f"{ctx.author.mention}-{ctx.author.id}:\n{ctx.message.content}")
 
 
 def read_config():

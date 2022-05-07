@@ -1,11 +1,23 @@
 import datetime
 from  bot import read_config
+from discord.ext import commands
 
-def is_leader(ctx):
-    cfg = read_config()
-    return ctx.author.id in cfg["club_leaders"]
+cfg = read_config()
+
+def is_leader():
+    async def predicate(ctx):
+        if ctx.author.id not in cfg["club_leaders"]:
+            raise NotLeader()
+        return True
+
+    return commands.check(predicate)
 
 def get_club():
-    cfg = read_config()
     return cfg["club_guild"]
 
+class HierarchyPermissionError(commands.CommandError):
+    def __init__(self, ctx, target):
+        super().__init__('', [ctx, target])
+
+class NotLeader(commands.CheckFailure):
+    pass
