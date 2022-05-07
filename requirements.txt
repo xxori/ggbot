@@ -1,0 +1,6 @@
+orson >= 3.6.8
+py-cord >= 1.7.3
+pychallonge >= 1.11.5
+cchardet >= 2.1.7
+brotlipy >= 0.7.0
+aiodns >= 3.0.0
