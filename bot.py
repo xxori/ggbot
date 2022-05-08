@@ -1,5 +1,5 @@
 import discord
-from discord.ext import bridge,commands
+from discord.ext import bridge, commands
 import traceback
 import os
 import sys
@@ -10,6 +10,7 @@ import json
 import logging
 import time
 
+
 class ggBot(bridge.AutoShardedBot):
     def __init__(self, logger, config):
         super(ggBot, self).__init__(command_prefix=">", intents=discord.Intents.all())
@@ -18,6 +19,10 @@ class ggBot(bridge.AutoShardedBot):
         self.run_time = None
         self.connect_time = None
         self.module_directories = ["extensions"]
+        if config["embed_color"] == "blurple":
+            self.emb_color = discord.Color.blurple()
+        else:
+            self.emb_color = config["embed_color"]
 
     def is_leader(self, ctx):
         return ctx.author.id in self.config["club_leaders"]
@@ -56,17 +61,16 @@ class ggBot(bridge.AutoShardedBot):
             self.logger.critical(f"Connection Error - {e}")
 
         runtime = datetime.datetime.utcnow() - self.run_time
-        self.logger.info(
-            f'Running duration: {runtime}'
-        )
+        self.logger.info(f"Running duration: {runtime}")
 
     async def close(self):
         if hasattr(self, "session"):
             await self.session.close()
         await super().close()
         self.logger.info("Bot has shut down successfully.")
-    
+
         # events
+
     async def on_message(self, message):
         if self.is_ready:
             ctx = await self.get_context(message)
@@ -78,7 +82,7 @@ class ggBot(bridge.AutoShardedBot):
                 return
             if ctx.guild != self.guild:
                 return
-            
+
             await super().on_message(message)
 
     async def on_ready(self):
@@ -91,7 +95,9 @@ class ggBot(bridge.AutoShardedBot):
 
         self.session = aiohttp.ClientSession(loop=self.loop)
 
-        await self.change_presence(activity=discord.Game(name="DM me to message the mods!"))
+        await self.change_presence(
+            activity=discord.Game(name="DM me to message the mods!")
+        )
 
         self.guild = self.get_guild(self.config["club_guild"])
         if not self.guild:
@@ -112,9 +118,11 @@ class ggBot(bridge.AutoShardedBot):
         await self.logchannel.send(
             f"[{datetime.utcnow().strptime('%d/%m/y %H:%M')} UTC] " + str(message)
         )
-    
+
     async def modmail(self, ctx):
-        await self.mailchannel.send(f"{ctx.author.mention}-{ctx.author.id}:\n{ctx.message.content}")
+        await self.mailchannel.send(
+            f"{ctx.author.mention}-{ctx.author.id}:\n{ctx.message.content}"
+        )
 
 
 def read_config():
@@ -122,12 +130,12 @@ def read_config():
         "token": "create an application at https://discordapp.com/developers/",
         "logfiles": {"enabled": False, "overwrite": False},
         "log_channel": -1,
-        "club_leaders": [
-            -1
-        ],  # developers that can execute dev commands
+        "club_leaders": [-1],  # developers that can execute dev commands
         "club_guild": -1,  # main guild bot operates around, set to -1 to disable
         "log_channel": -1,
-        "modmail_channel": -1
+        "modmail_channel": -1,
+        "embed_color": "blurple",
+        "challonge_api_key": -1,
     }
 
     if not os.path.isfile("config.json"):
