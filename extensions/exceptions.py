@@ -85,9 +85,7 @@ class EventHandler(discord.Cog):
             traceback.print_exception(type(e), e, e.__traceback__)
 
         elif isinstance(e, utils.NotLeader):
-            await ctx.send(
-                ":closed_lock_with_key: You have to be a club leader to run this command"
-            )
+            pass
 
         elif isinstance(e, commands.CheckFailure):
             # checks should never just return, but instead raise an error to be caught here

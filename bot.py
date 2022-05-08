@@ -135,7 +135,8 @@ def read_config():
         "log_channel": -1,
         "modmail_channel": -1,
         "embed_color": "blurple",
-        "challonge_api_key": -1,
+        "challonge_username": "challonge username here: https://challonge.com",
+        "challonge_api_key": "challonge API key here: https://challonge.com"
     }
 
     if not os.path.isfile("config.json"):
