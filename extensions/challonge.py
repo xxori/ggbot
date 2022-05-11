@@ -4,6 +4,8 @@ from discord.ext import bridge, commands
 import utils
 import asyncio
 import re
+import orjson
+import os
 
 URL_CONDITION = re.compile(r"^[A-Za-z0-9_]*$")
 
@@ -81,6 +83,39 @@ class Challonge(discord.Cog):
             await msg.edit("Updating tournament ``" + str(id) + "`` success")
         except:
             await msg.edit("Updating tournament ``" + str(id) + "`` failed")
+    
+    @tournament.command(brief="Updates tournament users to challonge")
+    @utils.is_leader()
+    async def update_participants(self, ctx ,id:int):
+        names = [i["name"].split(" ")[0]+" "+i["name"].split(" ")[1][0] for i in self.bot.tournaments[id]]
+        return await ctx.send(str(names))
+
+        try:
+            challonge.participants.bulk_add(id,names)
+            await ctx.send("Participants successfully registered")
+        except:
+            await ctx.send("Error in adding participants")
+    
+    @tournament.command(brief="Start a tournament (This will alter the server hierarchy and add multiple users to the tournament channels)")
+    @utils.is_leader()
+    async def start(self,ctx,id:int):
+        await ctx.send("Are you sure you want to start this tournament? This will create a channel for each match and add the users (type confirm)")
+
+        def check(m):
+            return m.author == ctx.author
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=10.0)
+        except:
+            return await ctx.send("You timed out, please try again")
+        
+        if msg.content.lower() != "confirm":
+            return await ctx.send("Tournament init cancelled")
+        
+        if self.load_tournament(id) is False:
+            await ctx.send("Tournament loading failed, check json or id")
+        
+        await ctx.send(str(self.bot.tournaments[id]))
+
 
     @tournament.command(brief="Initiates the tournament creation wizard")
     @utils.is_leader()

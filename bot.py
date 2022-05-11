@@ -6,19 +6,21 @@ import sys
 import datetime
 import aiohttp
 import utils
-import json
 import logging
 import time
+import orjson
 
 
 class ggBot(bridge.AutoShardedBot):
     def __init__(self, logger, config):
+        self.tournaments = {}
         super(ggBot, self).__init__(command_prefix=">", intents=discord.Intents.all())
         self.logger = logger
         self.config = config
         self.run_time = None
         self.connect_time = None
         self.module_directories = ["extensions"]
+        self.tournament_directory = "tournaments"
         if config["embed_color"] == "blurple":
             self.emb_color = discord.Color.blurple()
         else:
@@ -49,6 +51,7 @@ class ggBot(bridge.AutoShardedBot):
         self.logger.info("Finished loading modules.")
 
     def run(self):
+        self.load_tournaments()
         self.load_cogs()
         self.run_time = datetime.datetime.utcnow()
         self.logger.info("Pre-start checks cleared, start login.")
@@ -64,6 +67,7 @@ class ggBot(bridge.AutoShardedBot):
         self.logger.info(f"Running duration: {runtime}")
 
     async def close(self):
+        self.write_tournaments()
         if hasattr(self, "session"):
             await self.session.close()
         await super().close()
@@ -123,6 +127,22 @@ class ggBot(bridge.AutoShardedBot):
         await self.mailchannel.send(
             f"{ctx.author.mention}-{ctx.author.id}:\n{ctx.message.content}"
         )
+    
+    def load_tournaments(self):
+        for fname in os.listdir(self.tournament_directory):
+            if "json" in fname:
+                tid = int(fname[:-5])
+                with open(os.path.join(self.tournament_directory, fname), "r") as f:
+                    self.tournaments[tid] = orjson.loads(f.read())
+    
+    def write_tournaments(self):
+        for tid in self.tournaments.keys():
+            tjson = orjson.dumbs(self.tournaments[tid])
+            fname = str(tid)+".json"
+            with open(os.path.join(self.tournament_directory, fname), "w+") as f:
+                f.write(tjson)
+
+
 
 
 def read_config():
@@ -141,11 +161,11 @@ def read_config():
 
     if not os.path.isfile("config.json"):
         with open("config.json", "w+") as f:
-            json.dump(conf_template, f, indent=4)
+            f.write(orjson.dumps(conf_template, indent=4))
         return conf_template
     else:
         with open("config.json", "r") as f:
-            data = json.load(f)
+            data = orjson.loads(f.read())
         return data
 
 
