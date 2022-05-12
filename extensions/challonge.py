@@ -83,39 +83,67 @@ class Challonge(discord.Cog):
             await msg.edit("Updating tournament ``" + str(id) + "`` success")
         except:
             await msg.edit("Updating tournament ``" + str(id) + "`` failed")
-    
+
     @tournament.command(brief="Updates tournament users to challonge")
     @utils.is_leader()
-    async def update_participants(self, ctx ,id:int):
-        names = [i["name"].split(" ")[0]+" "+i["name"].split(" ")[1][0] for i in self.bot.tournaments[id]]
-        return await ctx.send(str(names))
+    async def update_participants(self, ctx, id: int):
+        names = [
+            i["name"].split(" ")[0] + " " + i["name"].split(" ")[1][0]
+            for i in self.bot.tournaments[id]
+        ]
+        # return await ctx.send(str(names))
 
-        try:
-            challonge.participants.bulk_add(id,names)
+        namesin = [i["name"] for i in challonge.participants.index(id)]
+        names = set(names) ^ set(namesin)
+
+        if len(names) == 0:
+            await ctx.send("No new participants to be registered")
+        else:
+            challonge.participants.bulk_add(id, names)
             await ctx.send("Participants successfully registered")
-        except:
-            await ctx.send("Error in adding participants")
-    
-    @tournament.command(brief="Start a tournament (This will alter the server hierarchy and add multiple users to the tournament channels)")
+
+        r = challonge.participants.index(id)
+        for participant in r:
+            for user in self.bot.tournaments[id]:
+                if not participant["name"] or not user["name"]:
+                    continue
+                if participant["name"].lower() in user["name"].lower():
+                    user["challonge_pid"] = participant["id"]
+
+        await ctx.send("Participant ids updated")
+
+    @tournament.command(
+        brief="Start a tournament (This will alter the server hierarchy and add multiple users to the tournament channels)"
+    )
     @utils.is_leader()
-    async def start(self,ctx,id:int):
-        await ctx.send("Are you sure you want to start this tournament? This will create a channel for each match and add the users (type confirm)")
+    async def start(self, ctx, id: int):
+        await ctx.send(
+            "Are you sure you want to start this tournament? This will create a channel for each match and add the users (type confirm)"
+        )
 
         def check(m):
             return m.author == ctx.author
+
         try:
             msg = await self.bot.wait_for("message", check=check, timeout=10.0)
-        except:
+        except asyncio.TimeoutError:
             return await ctx.send("You timed out, please try again")
-        
+
         if msg.content.lower() != "confirm":
             return await ctx.send("Tournament init cancelled")
         
-        if self.load_tournament(id) is False:
-            await ctx.send("Tournament loading failed, check json or id")
-        
-        await ctx.send(str(self.bot.tournaments[id]))
+        await ctx.send("Updating participant ids")
+        await self.update_participants(id)
 
+        await ctx.send("Starting tournament using API")
+        #challonge.tournaments.start(id)
+        await ctx.send("Creating match channels")
+        m = "Creating match channels\n"
+
+        matches = challonge.matches.index(id, state="open")
+
+
+        
 
     @tournament.command(brief="Initiates the tournament creation wizard")
     @utils.is_leader()

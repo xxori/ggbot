@@ -9,6 +9,7 @@ import utils
 import logging
 import time
 import orjson
+from discord.utils import get
 
 
 class ggBot(bridge.AutoShardedBot):
@@ -115,6 +116,10 @@ class ggBot(bridge.AutoShardedBot):
         if not self.mailchannel:
             self.logger.critical("Modmail channel not found")
             await self.close()
+        self.tourncategory = get(self.guild.categories,id=self.config["tournament_category"])
+        if not self.tourncategory:
+            self.logger.critical("Tournament category not found")
+            await self.close()
 
         self.logger.info("Initialization finished.")
 
@@ -136,11 +141,13 @@ class ggBot(bridge.AutoShardedBot):
                     self.tournaments[tid] = orjson.loads(f.read())
     
     def write_tournaments(self):
+        print(self.tournaments)
         for tid in self.tournaments.keys():
-            tjson = orjson.dumbs(self.tournaments[tid])
+            tjson = orjson.dumps(self.tournaments[tid])
             fname = str(tid)+".json"
+            self.logger.info("Dumping Tourney Data")
             with open(os.path.join(self.tournament_directory, fname), "w+") as f:
-                f.write(tjson)
+                f.write(tjson.decode("utf-8"))
 
 
 
@@ -154,6 +161,7 @@ def read_config():
         "club_guild": -1,  # main guild bot operates around, set to -1 to disable
         "log_channel": -1,
         "modmail_channel": -1,
+        "tournament_category": -1,
         "embed_color": "blurple",
         "challonge_username": "challonge username here: https://challonge.com",
         "challonge_api_key": "challonge API key here: https://challonge.com"
