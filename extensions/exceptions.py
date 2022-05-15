@@ -99,9 +99,10 @@ class EventHandler(discord.Cog):
             return
 
         else:
-            await ctx.send(
-                f":x: An internal error has occurred. ```py\n{type(e)}: {e}```"
-            )
+            # await ctx.send(
+            #    f":x: An internal error has occurred. ```py\n{type(e)}: {e}```"
+            #)
+            await ctx.send(":x: Something went wrong. Contact admins if you expected it to go right")
             traceback.print_exception(type(e), e, e.__traceback__)
 
 

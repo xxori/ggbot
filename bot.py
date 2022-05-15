@@ -105,19 +105,19 @@ class ggBot(bridge.AutoShardedBot):
         )
 
         self.guild = self.get_guild(self.config["club_guild"])
-        if not self.guild:
+        if self.guild is None:
             self.logger.critical("Bot not a member of the club guild")
             await self.close()
         self.logchannel = self.guild.get_channel(self.config["log_channel"])
-        if not self.logchannel:
+        if self.logchannel is None:
             self.logger.critical("Logging channel not found")
             await self.close()
         self.mailchannel = self.guild.get_channel(self.config["modmail_channel"])
-        if not self.mailchannel:
+        if self.mailchannel is None:
             self.logger.critical("Modmail channel not found")
             await self.close()
         self.tourncategory = get(self.guild.categories,id=self.config["tournament_category"])
-        if not self.tourncategory:
+        if self.tourncategory is None:
             self.logger.critical("Tournament category not found")
             await self.close()
 
@@ -138,12 +138,15 @@ class ggBot(bridge.AutoShardedBot):
             if "json" in fname:
                 tid = int(fname[:-5])
                 with open(os.path.join(self.tournament_directory, fname), "r") as f:
-                    self.tournaments[tid] = orjson.loads(f.read())
+                    users_list = orjson.loads(f.read())
+                    self.tournaments[tid] = {}
+                    for player in users_list:
+                        self.tournaments[tid][player["name"].split(" ")[0] + " " + player["name"].split(" ")[1][0]] = player
+
     
     def write_tournaments(self):
-        print(self.tournaments)
         for tid in self.tournaments.keys():
-            tjson = orjson.dumps(self.tournaments[tid])
+            tjson = orjson.dumps(list(self.tournaments[tid].values()))
             fname = str(tid)+".json"
             self.logger.info("Dumping Tourney Data")
             with open(os.path.join(self.tournament_directory, fname), "w+") as f:

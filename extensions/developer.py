@@ -45,7 +45,7 @@ class Developer(discord.Cog):
                 f"Bot terminated from dms by {ctx.message.author} ({ctx.message.author.id})"
             )
         self.bot.logger.info("Bot has shut down successfully.")
-        await self.bot.logout()
+        await self.bot.close()
 
     @utils.is_leader()
     @commands.command(brief="Update presences rotation", hidden=True)

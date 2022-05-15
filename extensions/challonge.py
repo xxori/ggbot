@@ -21,12 +21,14 @@ class Challonge(discord.Cog):
         invoke_without_command=True,
         brief="Category with commands relating to Challonge tournaments",
         usage="[subcommand] <arguments>",
+        hidden=True,
     )
     @utils.is_leader()
     async def tournament(self, ctx):
         await self.list(ctx)
 
-    @tournament.command(brief="List ongoung tournaments")
+    @tournament.command(brief="List ongoung tournaments", hidden=True)
+    @utils.is_leader()
     async def list(self, ctx):
         msg = await ctx.send("Fetching...")
         tourneys = challonge.tournaments.index()
@@ -40,6 +42,34 @@ class Challonge(discord.Cog):
                 [f"{t['id']}-{t['name']}-{t['full_challonge_url']}" for t in tourneys]
             )
         )
+
+    @tournament.command(brief="Registers a user to a tournament", hidden=True)
+    @utils.is_leader()
+    async def register(
+        self,
+        ctx,
+        id: int,
+        name: str,
+        mentor_group: int,
+        discord_user: discord.Member,
+        email: str,
+    ):
+        name = name.replace("_", " ")
+        nshortened = getshortname(name)
+        if id in self.bot.tournaments.keys():
+            if nshortened in self.bot.tournaments[id].keys():
+                return await ctx.send("That user is already in the tournament bro")
+
+        if id not in self.bot.tournaments.keys():
+            self.bot.tournaments[id] = {}
+        self.bot.tournaments[id][nshortened] = {
+            "name": name,
+            "mentor_group": mentor_group,
+            "discord_id": discord_user.id,
+            "email": email,
+        }
+        await ctx.send("User added")
+        await self.update_participants(ctx, id)
 
     @tournament.command(
         brief="Show a specific tournament going on", usage="[tournament id]"
@@ -87,14 +117,13 @@ class Challonge(discord.Cog):
     @tournament.command(brief="Updates tournament users to challonge")
     @utils.is_leader()
     async def update_participants(self, ctx, id: int):
-        names = [
-            i["name"].split(" ")[0] + " " + i["name"].split(" ")[1][0]
-            for i in self.bot.tournaments[id]
-        ]
-        # return await ctx.send(str(names))
+        names = list(self.bot.tournaments[id].keys())
 
         namesin = [i["name"] for i in challonge.participants.index(id)]
-        names = set(names) ^ set(namesin)
+
+        names = set(names) ^ set(
+            namesin
+        )  # Getting names that aren't already in challonge through some cool xor
 
         if len(names) == 0:
             await ctx.send("No new participants to be registered")
@@ -103,12 +132,13 @@ class Challonge(discord.Cog):
             await ctx.send("Participants successfully registered")
 
         r = challonge.participants.index(id)
+        users = self.bot.tournaments[id]
         for participant in r:
-            for user in self.bot.tournaments[id]:
-                if not participant["name"] or not user["name"]:
+            for user in users.keys():
+                if not participant["name"] or not users[user]["name"]:
                     continue
-                if participant["name"].lower() in user["name"].lower():
-                    user["challonge_pid"] = participant["id"]
+                if participant["name"].lower() == user.lower():
+                    users[user]["challonge_pid"] = participant["id"]
 
         await ctx.send("Participant ids updated")
 
@@ -131,19 +161,54 @@ class Challonge(discord.Cog):
 
         if msg.content.lower() != "confirm":
             return await ctx.send("Tournament init cancelled")
-        
+
         await ctx.send("Updating participant ids")
-        await self.update_participants(id)
+        await self.update_participants(ctx, id)
 
         await ctx.send("Starting tournament using API")
-        #challonge.tournaments.start(id)
+        if challonge.tournaments.show(id)["state"] != "underway":
+            challonge.tournaments.start(id)
         await ctx.send("Creating match channels")
-        m = "Creating match channels\n"
 
         matches = challonge.matches.index(id, state="open")
+        for match in matches:
+            p1id = match["player1_id"]
+            p1 = None
 
+            p2id = match["player2_id"]
+            p2 = None
 
-        
+            for player in self.bot.tournaments[id].values():
+                if p1id == player["challonge_pid"]:
+                    p1 = player
+                if p2id == player["challonge_pid"]:
+                    p2 = player
+
+            if p1 is None or p2 is None:
+                return await ctx.send("Players not found")
+
+            guild = self.bot.guild
+            m1 = guild.get_member(p1["discord_id"])
+            m2 = guild.get_member(p2["discord_id"])
+
+            overrides = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                m1: discord.PermissionOverwrite(
+                    read_messages=True, read_message_history=True, send_messages=True
+                ),
+                m2: discord.PermissionOverwrite(
+                    read_messages=True, read_message_history=True, send_messages=True
+                ),
+            }
+
+            channel = await self.bot.tourncategory.create_text_channel(
+                f"{getshortname(p1['name'])} vs {getshortname(p2['name'])}",
+                reason="Automatic tournament generation",
+                topic=str(id)+"-"+str(match["id"]),
+                overwrites=overrides,
+            )
+            await channel.send(f"{m1.mention} vs {m2.mention}. among us")
+        await ctx.send("Done")
 
     @tournament.command(brief="Initiates the tournament creation wizard")
     @utils.is_leader()
@@ -240,10 +305,84 @@ class Challonge(discord.Cog):
 
         except asyncio.TimeoutError:
             await ctx.send("You have timed out, please restart")
+    
+    @bridge.bridge_command(brief="Reports score for a tournament game (Format X-Y where X is your score and Y is opponents)")
+    async def report(self,ctx,score:str):
+        if ctx.channel.category != self.bot.tourncategory:
+            return await ctx.respond("This command can only be used in tournament channels")
+        
+        if len(score.split("-")) != 2 or not score.split("-")[0].isdigit() or not score.split("-")[1].isdigit():
+            return await ctx.respond("Please report match score in format X-Y where x is your score and y is the opponents score as numbers")
+        
+        tournid = int(ctx.channel.topic.split("-")[0])
+        matchid = int(ctx.channel.topic.split("-")[1])
+        match = challonge.matches.show(tournid,matchid)
+        if match["state"] != "open":
+            return await ctx.respond("Reporting is not currently allowed on this match")
+        p1id = match["player1_id"]
+        p1 = None
+
+        p2id = match["player2_id"]
+        p2 = None
+
+        for player in self.bot.tournaments[tournid].values():
+            if p1id == player["challonge_pid"]:
+                p1 = player
+            if p2id == player["challonge_pid"]:
+                p2 = player
+
+        if p1 is None or p2 is None:
+            return await ctx.respond("Something went wrong. Please contact admins")
+        
+        m1 = ctx.guild.get_member(p1["discord_id"])
+        m2 = ctx.guild.get_member(p2["discord_id"])
+
+        if ctx.author not in [m1,m2]:
+            return await ctx.respond("You are not a participant in this match")
+
+        if m1 is None or m2 is None:
+            return await ctx.respond("Something went wrong. Please contact admins")
+        
+        if ctx.author.id == p2["discord_id"]:
+            score = score.split("-")[1] + "-" + score.split("-")[0]
+            othermem = m1
+        else:
+            othermem = m2
+        
+        if int(score.split("-")[0]) > int(score.split("-")[1]):
+            winner = m1
+            winnerid = p1["challonge_pid"]
+        elif int(score.split("-")[1]) > int(score.split("-")[0]):
+            winner = m2
+            winnerid = p2["challonge_pid"]
+        else:
+            return await ctx.respond("Something went wrong. Please contacta dmins")
+        
+        await ctx.respond("Successfully reported")
+        await ctx.send(f"Pending score {score} with {winner.mention} winning. Please type 'confirm' to confirm these results or anything else to deny them {othermem.mention}. Anyone else may also type 'cancel' to cancel score submission")
+        
+        def check(m):
+            return m.content.lower() == 'cancel' or m.author == othermem
+
+        try:
+            m = await self.bot.wait_for("message", check=check, timeout=60.0)
+        except asyncio.TimeoutError:
+            return await ctx.send("Confirmation timed out, try again")
+        
+        if m.content.lower() == "cancel" or (m.author == othermem and m.content.lower() != "confirm"):
+            return await ctx.send("Score submission cancelled, try again")
+        
+        challonge.matches.update(tournid,matchid,scores_csv=score,winner_id=winnerid)
+        await ctx.send("Score successfully updated")
+
 
 
 def check_cancel(arg):
     return arg.lower() == "cancel"
+
+
+def getshortname(name):
+    return name.split(" ")[0] + " " + name.split(" ")[1][0]
 
 
 def setup(bot):
