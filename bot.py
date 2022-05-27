@@ -87,6 +87,7 @@ class ggBot(bridge.AutoShardedBot):
                 return
             if ctx.guild != self.guild:
                 return
+            
 
             await super().on_message(message)
 
@@ -116,7 +117,9 @@ class ggBot(bridge.AutoShardedBot):
         if self.mailchannel is None:
             self.logger.critical("Modmail channel not found")
             await self.close()
-        self.tourncategory = get(self.guild.categories,id=self.config["tournament_category"])
+        self.tourncategory = get(
+            self.guild.categories, id=self.config["tournament_category"]
+        )
         if self.tourncategory is None:
             self.logger.critical("Tournament category not found")
             await self.close()
@@ -125,34 +128,29 @@ class ggBot(bridge.AutoShardedBot):
 
     async def log(self, message):
         await self.logchannel.send(
-            f"[{datetime.utcnow().strptime('%d/%m/y %H:%M')} UTC] " + str(message)
+            str(message)
         )
 
     async def modmail(self, ctx):
         await self.mailchannel.send(
             f"{ctx.author.mention}-{ctx.author.id}:\n{ctx.message.content}"
         )
-    
+
     def load_tournaments(self):
         for fname in os.listdir(self.tournament_directory):
             if "json" in fname:
                 tid = int(fname[:-5])
                 with open(os.path.join(self.tournament_directory, fname), "r") as f:
                     users_list = orjson.loads(f.read())
-                    self.tournaments[tid] = {}
-                    for player in users_list:
-                        self.tournaments[tid][player["name"].split(" ")[0] + " " + player["name"].split(" ")[1][0]] = player
+                    self.tournaments[tid] = users_list
 
-    
     def write_tournaments(self):
         for tid in self.tournaments.keys():
-            tjson = orjson.dumps(list(self.tournaments[tid].values()))
-            fname = str(tid)+".json"
+            tjson = orjson.dumps(list(self.tournaments[tid]))
+            fname = str(tid) + ".json"
             self.logger.info("Dumping Tourney Data")
             with open(os.path.join(self.tournament_directory, fname), "w+") as f:
                 f.write(tjson.decode("utf-8"))
-
-
 
 
 def read_config():
@@ -167,12 +165,12 @@ def read_config():
         "tournament_category": -1,
         "embed_color": "blurple",
         "challonge_username": "challonge username here: https://challonge.com",
-        "challonge_api_key": "challonge API key here: https://challonge.com"
+        "challonge_api_key": "challonge API key here: https://challonge.com",
     }
 
     if not os.path.isfile("config.json"):
         with open("config.json", "w+") as f:
-            f.write(orjson.dumps(conf_template, indent=4))
+            f.write(orjson.dumps(conf_template).decode("utf-8"))
         return conf_template
     else:
         with open("config.json", "r") as f:
