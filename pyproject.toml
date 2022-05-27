@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "ggbot"
+version = "0.1.0"
+description = "Official GIHS Gaming+ Club Discord Bot"
+authors = ["xxori"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+orjson = "^3.6.8"
+pychallonge = "^1.11.5"
+cchardet = "^2.1.7"
+brotlipy = "^0.7.0"
+aiodns = "^3.0.0"
+py-cord = {git = "https://github.com/Pycord-Development/pycord"}
+peewee = "^3.14.10"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+bot = "bot.py:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
